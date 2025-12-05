@@ -497,38 +497,6 @@ After（実測ベース運用）:
 └─ 根拠: 負荷試験 + 理論値計算
 └─ 判断: 投資対効果を正確に算出可能
 ```
-
----
-
-## 🎓 ポートフォリオ活用
-
-### 面接での訴求ポイント
-
-```markdown
-## スクレイピングシステムの並列限界検証
-
-### 課題
-43サイト監視システムの拡張可否を判断する客観的根拠が必要
-
-### アプローチ
-1. k6で並列負荷試験実施（10サイト → 60サイト）
-2. Playwrightメモリ使用量を実測（175MB/instance）
-3. 理論値計算でVPS限界を算出
-
-### 結果
-- VPS 4GB: 43サイトが限界（メモリ使用率95.1%）
-- 60サイト対応: 8GBアップグレード必須
-- ROI試算: 6,067%（月18万円増収 / 月3千円投資）
-
-### 技術スタック
-Python, FastAPI, k6, Docker, Prometheus, Playwright
-
-### 所要時間
-2時間（設計30分、実装30分、試験1時間）
-```
-
----
-
 ## 🔬 テスト詳細
 
 ### Phase 1: 現状負荷（43サイト）
@@ -596,7 +564,7 @@ MIT License
 **rancorder**
 
 - GitHub: [@rancorder](https://github.com/rancorder)
-- Portfolio: [rancorder.github.io](https://rancorder.github.io/portfolio_GAFAM_SRE_FINAL.html)
+- Portfolio: [rancorder.github.io](https://aistudio.netlify.app/portfolio_engineer.html)
 - 実績: 43サイト24/7監視システム（稼働率99.9%、月72万円コスト削減）
 
 ---
