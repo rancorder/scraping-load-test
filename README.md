@@ -27,79 +27,119 @@
 
 ---
 
-## 🏗️ システムフロー
+## 🏗️ システムアーキテクチャ
 
-```mermaid
-graph TB
-    A[k6 負荷試験] --> B[FastAPI アプリ]
-    B --> C[Prometheus メトリクス収集]
-    C --> D[Grafana ダッシュボード]
-    B --> E[Docker 4GB制限]
-    B --> F[psutil メモリ監視]
-    F --> G[理論値計算<br/>Playwright: 175MB<br/>Normal: 20MB]
-    G --> H[限界算出<br/>43サイト = 95.1%<br/>60サイト = 129.9%]
-    H --> I[ROI試算<br/>8GB upgrade<br/>ROI 6,067%]
-    
-    style A fill:#FF6B6B,color:#fff
-    style B fill:#4ECDC4,color:#fff
-    style C fill:#F093FB,color:#fff
-    style D fill:#F093FB,color:#fff
-    style E fill:#95E1D3,color:#000
-    style I fill:#FFD93D,color:#000
+<table>
+<tr>
+<td colspan="3" align="center" bgcolor="#FF6B6B"><b>🔴 負荷試験レイヤー</b></td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<b>k6</b><br/>
+並列負荷試験
+</td>
+<td align="center" width="33%">
+<b>Playwright Simulator</b><br/>
+重量級処理<br/>
+（175MB/instance）
+</td>
+<td align="center" width="33%">
+<b>Normal Scraper</b><br/>
+軽量処理<br/>
+（20MB/instance）
+</td>
+</tr>
+<tr>
+<td colspan="3" align="center">⬇️</td>
+</tr>
+
+<tr>
+<td colspan="3" align="center" bgcolor="#4ECDC4"><b>🔵 アプリケーションレイヤー</b></td>
+</tr>
+<tr>
+<td colspan="3" align="center">
+<b>FastAPI 非同期WebAPI</b><br/><br/>
+<code>/api/scrape/:site_id</code> （並列実行）<br/>
+<code>/health</code> （ヘルスチェック）<br/>
+<code>/stats</code> （統計情報）<br/>
+<code>/metrics</code> （Prometheusメトリクス）
+</td>
+</tr>
+<tr>
+<td colspan="3" align="center">⬇️</td>
+</tr>
+
+<tr>
+<td colspan="3" align="center" bgcolor="#F093FB"><b>🟣 監視レイヤー</b></td>
+</tr>
+<tr>
+<td align="center">
+<b>Prometheus</b><br/>
+メトリクス収集<br/>
+（5秒間隔）
+</td>
+<td align="center">➡️</td>
+<td align="center">
+<b>Grafana</b><br/>
+ダッシュボード<br/>
+可視化
+</td>
+</tr>
+<tr>
+<td colspan="3" align="center">⬇️</td>
+</tr>
+
+<tr>
+<td colspan="3" align="center" bgcolor="#95E1D3"><b>🟢 インフラレイヤー</b></td>
+</tr>
+<tr>
+<td align="center">
+<b>Docker</b><br/>
+4GB Memory Limit
+</td>
+<td align="center">+</td>
+<td align="center">
+<b>psutil</b><br/>
+メモリ監視
+</td>
+</tr>
+<tr>
+<td colspan="3" align="center">⬇️</td>
+</tr>
+
+<tr>
+<td colspan="3" align="center" bgcolor="#FFD93D"><b>🟡 分析レイヤー</b></td>
+</tr>
+<tr>
+<td colspan="3" align="left">
+<b>Step 1: 理論値計算</b><br/>
+├─ Playwright: 175MB × 17サイト = 2,975MB<br/>
+├─ Normal: 20MB × 26サイト = 520MB<br/>
+└─ System: 400MB<br/>
+<br/>
+<b>Step 2: 限界算出</b><br/>
+├─ 43 sites: 3,895MB (95.1%) ✅ ギリギリ限界<br/>
+├─ 60 sites: 5,320MB (129.9%) ❌ メモリ不足<br/>
+└─ 80 sites: 6,960MB (169.9%) ❌ 完全アウト<br/>
+<br/>
+<b>Step 3: ROI試算</b><br/>
+└─ 8GB upgrade → <b>ROI 6,067%</b> (月18万円増収 / 月3千円投資)
+</td>
+</tr>
+</table>
+
+### データフロー概要
+
 ```
-
-### アーキテクチャ詳細
-
-```
-┌─────────────────────────────────────────────────────┐
-│              負荷試験レイヤー                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │   k6     │  │Playwright│  │  Normal  │          │
-│  │並列負荷  │  │Simulator │  │ Scraper  │          │
-│  └─────┬────┘  └─────┬────┘  └─────┬────┘          │
-└────────┼─────────────┼─────────────┼───────────────┘
-         │             │             │
-         └─────────────┴─────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│            アプリケーションレイヤー                  │
-│  ┌────────────────────────────────────────────┐     │
-│  │         FastAPI 非同期WebAPI               │     │
-│  │  • /api/scrape/:site_id (並列実行)        │     │
-│  │  • /health (ヘルスチェック)               │     │
-│  │  • /stats (統計情報)                      │     │
-│  │  • /metrics (Prometheusメトリクス)        │     │
-│  └─────┬──────────────────────────────────────┘     │
-└────────┼───────────────────────────────────────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼───┐ ┌──▼──────────────────────────────────────┐
-│Docker │ │          監視レイヤー                    │
-│4GB    │ │  ┌─────────────┐  ┌──────────────┐     │
-│Memory │ │  │ Prometheus  │→ │   Grafana    │     │
-│Limit  │ │  │メトリクス収集│  │ダッシュボード│     │
-└───┬───┘ │  └─────────────┘  └──────────────┘     │
-    │     └──────────────────────────────────────────┘
-    │
-┌───▼──────────────────────────────────────────────────┐
-│              分析レイヤー                             │
-│                                                       │
-│  Step 1: 理論値計算                                  │
-│  ├─ Playwright: 175MB/instance × 17 = 2,975MB       │
-│  ├─ Normal: 20MB/instance × 26 = 520MB              │
-│  └─ System: 400MB                                    │
-│                                                       │
-│  Step 2: 並列限界算出                                │
-│  ├─ 43 sites: 3,895MB (95.1%) ✅ ギリギリ           │
-│  ├─ 60 sites: 5,320MB (129.9%) ❌ 限界超過          │
-│  └─ 80 sites: 6,960MB (169.9%) ❌ 完全アウト        │
-│                                                       │
-│  Step 3: ROI試算                                     │
-│  ├─ 8GB upgrade: +¥3,000/month                      │
-│  ├─ 追加収益: +¥182,000/month                       │
-│  └─ ROI: 6,067%                                      │
-└───────────────────────────────────────────────────────┘
+負荷試験（k6）
+    ↓
+アプリ（FastAPI）
+    ↓
+監視（Prometheus → Grafana）
+    ↓
+インフラ（Docker 4GB + psutil）
+    ↓
+分析（理論計算 → 限界算出 → ROI試算）
 ```
 
 ---
