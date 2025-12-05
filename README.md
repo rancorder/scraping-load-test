@@ -31,68 +31,75 @@
 
 ```mermaid
 graph TB
-    subgraph LoadTesting["負荷試験レイヤー"]
-        A[k6<br/>並列負荷試験]
-        A1[Playwright Simulator<br/>重量級処理模擬]
-        A2[Normal Scraper<br/>軽量処理模擬]
-    end
-    
-    subgraph Application["アプリケーションレイヤー"]
-        B[FastAPI<br/>非同期WebAPI]
-        B1[/api/scrape/:site_id<br/>スクレイピングエンドポイント]
-        B2[/health<br/>ヘルスチェック]
-        B3[/stats<br/>統計情報]
-        B4[/metrics<br/>Prometheusメトリクス]
-    end
-    
-    subgraph Monitoring["監視レイヤー"]
-        C[Prometheus<br/>メトリクス収集]
-        D[Grafana<br/>ダッシュボード]
-        E[メトリクス<br/>scrape_requests_total<br/>memory_usage_mb<br/>playwright_instances]
-    end
-    
-    subgraph Infrastructure["インフラレイヤー"]
-        F[Docker<br/>4GB Memory Limit]
-        G[psutil<br/>メモリ監視]
-    end
-    
-    subgraph Analysis["分析レイヤー"]
-        H[理論値計算<br/>Playwright: 175MB/instance<br/>Normal: 20MB/instance]
-        I[限界算出<br/>43 sites = 95.1%<br/>60 sites = 129.9%]
-        J[ROI試算<br/>8GB upgrade<br/>+¥182,000/month]
-    end
-    
-    A --> A1
-    A --> A2
-    A1 --> B1
-    A2 --> B1
-    
-    B --> B1
-    B --> B2
-    B --> B3
-    B --> B4
-    
-    B1 --> G
-    B2 --> G
-    B3 --> G
-    B4 --> E
-    
-    E --> C
-    C --> D
-    
-    F --> B
-    G --> E
-    
-    E --> H
-    H --> I
-    I --> J
+    A[k6 負荷試験] --> B[FastAPI アプリ]
+    B --> C[Prometheus メトリクス収集]
+    C --> D[Grafana ダッシュボード]
+    B --> E[Docker 4GB制限]
+    B --> F[psutil メモリ監視]
+    F --> G[理論値計算<br/>Playwright: 175MB<br/>Normal: 20MB]
+    G --> H[限界算出<br/>43サイト = 95.1%<br/>60サイト = 129.9%]
+    H --> I[ROI試算<br/>8GB upgrade<br/>ROI 6,067%]
     
     style A fill:#FF6B6B,color:#fff
     style B fill:#4ECDC4,color:#fff
     style C fill:#F093FB,color:#fff
     style D fill:#F093FB,color:#fff
-    style F fill:#95E1D3,color:#000
-    style J fill:#FFD93D,color:#000
+    style E fill:#95E1D3,color:#000
+    style I fill:#FFD93D,color:#000
+```
+
+### アーキテクチャ詳細
+
+```
+┌─────────────────────────────────────────────────────┐
+│              負荷試験レイヤー                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
+│  │   k6     │  │Playwright│  │  Normal  │          │
+│  │並列負荷  │  │Simulator │  │ Scraper  │          │
+│  └─────┬────┘  └─────┬────┘  └─────┬────┘          │
+└────────┼─────────────┼─────────────┼───────────────┘
+         │             │             │
+         └─────────────┴─────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│            アプリケーションレイヤー                  │
+│  ┌────────────────────────────────────────────┐     │
+│  │         FastAPI 非同期WebAPI               │     │
+│  │  • /api/scrape/:site_id (並列実行)        │     │
+│  │  • /health (ヘルスチェック)               │     │
+│  │  • /stats (統計情報)                      │     │
+│  │  • /metrics (Prometheusメトリクス)        │     │
+│  └─────┬──────────────────────────────────────┘     │
+└────────┼───────────────────────────────────────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼───┐ ┌──▼──────────────────────────────────────┐
+│Docker │ │          監視レイヤー                    │
+│4GB    │ │  ┌─────────────┐  ┌──────────────┐     │
+│Memory │ │  │ Prometheus  │→ │   Grafana    │     │
+│Limit  │ │  │メトリクス収集│  │ダッシュボード│     │
+└───┬───┘ │  └─────────────┘  └──────────────┘     │
+    │     └──────────────────────────────────────────┘
+    │
+┌───▼──────────────────────────────────────────────────┐
+│              分析レイヤー                             │
+│                                                       │
+│  Step 1: 理論値計算                                  │
+│  ├─ Playwright: 175MB/instance × 17 = 2,975MB       │
+│  ├─ Normal: 20MB/instance × 26 = 520MB              │
+│  └─ System: 400MB                                    │
+│                                                       │
+│  Step 2: 並列限界算出                                │
+│  ├─ 43 sites: 3,895MB (95.1%) ✅ ギリギリ           │
+│  ├─ 60 sites: 5,320MB (129.9%) ❌ 限界超過          │
+│  └─ 80 sites: 6,960MB (169.9%) ❌ 完全アウト        │
+│                                                       │
+│  Step 3: ROI試算                                     │
+│  ├─ 8GB upgrade: +¥3,000/month                      │
+│  ├─ 追加収益: +¥182,000/month                       │
+│  └─ ROI: 6,067%                                      │
+└───────────────────────────────────────────────────────┘
 ```
 
 ---
